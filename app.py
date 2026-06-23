@@ -10,7 +10,7 @@ st.set_page_config(page_title="TRL-SVE Analyst Dashboard", layout="wide", page_i
 @st.cache_data
 def load_data():
     try:
-        df = pd.read_csv("pipeline_g_results.csv")
+        df = pd.read_csv("pipeline_g_results.zip")
         return df
     except FileNotFoundError:
         st.error("Dataset not found. Please ensure pipeline_g_results.csv is uploaded.")
