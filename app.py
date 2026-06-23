@@ -4,7 +4,7 @@ import plotly.express as px
 import time
 
 # --- PAGE CONFIGURATION ---
-st.set_page_config(page_title="TRL-SVE Analyst Dashboard", layout="wide", page_icon="🛡️")
+st.set_page_config(page_title="TRL-SVE Dashboard", layout="wide", page_icon="🛡️")
 
 # --- LOAD REAL 50K DATASET ---
 @st.cache_data
