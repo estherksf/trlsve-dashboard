@@ -27,19 +27,52 @@ st.divider()
 if not df_results.empty:
     # --- SIDEBAR: SEARCH REAL RECORDS ---
     st.sidebar.header("🔍 Search Database")
+    st.sidebar.markdown("Use the filters below to narrow down the 50k benchmark subset.")
     
-    # Let the user pick a random user ID from the dataset
-    sample_users = df_results['user_id'].head(200).tolist()
-    selected_user = st.sidebar.selectbox("Select User ID:", sample_users)
+    # 1. Filter by True Label
+    label_filter = st.sidebar.selectbox(
+        "1. Filter by True Label:",
+        ["All Reviews", "Deceptive Only (1)", "Genuine Only (0)"]
+    )
     
-    analyze_button = st.sidebar.button("Retrieve TRL-SVE Output", type="primary")
+    # Apply Label Filter to a temporary dataframe
+    filtered_df = df_results.copy()
+    if label_filter == "Deceptive Only (1)":
+        filtered_df = filtered_df[filtered_df['true_label'] == 1]
+    elif label_filter == "Genuine Only (0)":
+        filtered_df = filtered_df[filtered_df['true_label'] == 0]
+        
+    # 2. Filter by Product ID (Business)
+    # Get unique products based on the current label filter
+    product_list = ["All Products"] + sorted(filtered_df['product_id'].astype(str).unique().tolist())
+    product_filter = st.sidebar.selectbox("2. Filter by Target Business:", product_list)
+    
+    # Apply Product Filter
+    if product_filter != "All Products":
+        filtered_df = filtered_df[filtered_df['product_id'] == product_filter]
+        
+    # 3. Select User ID (Searchable via typing)
+    # The user list is now dynamically narrowed down by the filters above
+    available_users = filtered_df['user_id'].astype(str).tolist()
+    
+    if len(available_users) == 0:
+        st.sidebar.warning("No records match these exact filters.")
+        selected_user = None
+        analyze_button = st.sidebar.button("Retrieve TRL-SVE Output", type="primary", disabled=True)
+    else:
+        selected_user = st.sidebar.selectbox(
+            f"3. Select User ID ({len(available_users)} available):", 
+            available_users,
+            help="Click the box and start typing to search for a specific User ID."
+        )
+        analyze_button = st.sidebar.button("Retrieve TRL-SVE Output", type="primary")
 
-    if analyze_button:
+    if analyze_button and selected_user is not None:
         with st.spinner("Retrieving Pipeline G architectural logs..."):
             time.sleep(0.5) 
             
         # Extract the exact row for this user
-        record = df_results[df_results['user_id'] == selected_user].iloc[0]
+        record = df_results[df_results['user_id'] == str(selected_user)].iloc[0]
         
         # Determine Status (Using 50% as the threshold)
         is_fraud = record['predicted_probability'] >= 50.0 
