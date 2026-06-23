@@ -11,7 +11,7 @@ st.set_page_config(page_title="TRL-SVE Dashboard", layout="wide", page_icon="ðŸ›
 def load_data():
     try:
         # Note: If you used the compression workaround for GitHub, change this to "pipeline_g_results.csv.zip"
-        df = pd.read_csv("pipeline_g_results.csv")
+        df = pd.read_csv("pipeline_g_results.zip")
         return df
     except FileNotFoundError:
         st.error("Dataset not found. Please ensure pipeline_g_results.csv is uploaded.")
