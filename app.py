@@ -19,7 +19,7 @@ def load_data():
 df_results = load_data()
 
 # --- HEADER ---
-st.title("🛡️ TRL-SVE Analyst Dashboard")
+st.title("🛡️ TRL-SVE Dashboard")
 st.markdown("**Real-Data Explorer:** Querying the Pipeline G validation subset.")
 st.divider()
 
