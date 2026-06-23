@@ -6,15 +6,15 @@ import time
 # --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="TRL-SVE Dashboard", layout="wide", page_icon="🛡️")
 
-# --- LOAD REAL DATASET ---
+# --- LOAD REAL DATASET (ZIP COMPRESSION) ---
 @st.cache_data
 def load_data():
     try:
-        # Note: If you used the compression workaround for GitHub, change this to "pipeline_g_results.csv.zip"
+        # Pandas automatically handles the extraction of the .zip file
         df = pd.read_csv("pipeline_g_results.zip")
         return df
     except FileNotFoundError:
-        st.error("Dataset not found. Please ensure pipeline_g_results.csv is uploaded.")
+        st.error("Dataset not found. Please ensure pipeline_g_results.csv.zip is uploaded to GitHub.")
         return pd.DataFrame()
 
 df_results = load_data()
@@ -27,52 +27,69 @@ st.divider()
 if not df_results.empty:
     # --- SIDEBAR: SEARCH REAL RECORDS ---
     st.sidebar.header("🔍 Search Database")
-    st.sidebar.markdown("Use the filters below to narrow down the 50k benchmark subset.")
     
-    # 1. Filter by True Label
-    label_filter = st.sidebar.selectbox(
-        "1. Filter by True Label:",
-        ["All Reviews", "Deceptive Only (1)", "Genuine Only (0)"]
+    # Toggle for Search Mode
+    search_mode = st.sidebar.radio(
+        "Select Search Mode:", 
+        ["Direct User Lookup", "Explore via Filters"]
     )
     
-    # Apply Label Filter to a temporary dataframe
-    filtered_df = df_results.copy()
-    if label_filter == "Deceptive Only (1)":
-        filtered_df = filtered_df[filtered_df['true_label'] == 1]
-    elif label_filter == "Genuine Only (0)":
-        filtered_df = filtered_df[filtered_df['true_label'] == 0]
-        
-    # 2. Filter by Product ID (Business)
-    # Get unique products based on the current label filter
-    product_list = ["All Products"] + sorted(filtered_df['product_id'].astype(str).unique().tolist())
-    product_filter = st.sidebar.selectbox("2. Filter by Target Business:", product_list)
+    st.sidebar.divider()
     
-    # Apply Product Filter
-    if product_filter != "All Products":
-        filtered_df = filtered_df[filtered_df['product_id'] == product_filter]
-        
-    # 3. Select User ID (Searchable via typing)
-    # The user list is now dynamically narrowed down by the filters above
-    available_users = filtered_df['user_id'].astype(str).tolist()
-    
-    if len(available_users) == 0:
-        st.sidebar.warning("No records match these exact filters.")
-        selected_user = None
-        analyze_button = st.sidebar.button("Retrieve TRL-SVE Output", type="primary", disabled=True)
-    else:
+    if search_mode == "Direct User Lookup":
+        st.sidebar.markdown("**Targeted Investigation:**")
+        all_users = sorted(df_results['user_id'].astype(str).unique().tolist())
         selected_user = st.sidebar.selectbox(
-            f"3. Select User ID ({len(available_users)} available):", 
-            available_users,
-            help="Click the box and start typing to search for a specific User ID."
+            "Search User ID:", 
+            all_users,
+            help="Click the box and start typing to instantly find a user."
         )
         analyze_button = st.sidebar.button("Retrieve TRL-SVE Output", type="primary")
 
+    else:
+        st.sidebar.markdown("**Pattern Discovery:**")
+        # 1. Filter by True Label
+        label_filter = st.sidebar.selectbox(
+            "1. Filter by True Label:",
+            ["All Reviews", "Deceptive Only (1)", "Genuine Only (0)"]
+        )
+        
+        # Apply Label Filter
+        filtered_df = df_results.copy()
+        if label_filter == "Deceptive Only (1)":
+            filtered_df = filtered_df[filtered_df['true_label'] == 1]
+        elif label_filter == "Genuine Only (0)":
+            filtered_df = filtered_df[filtered_df['true_label'] == 0]
+            
+        # 2. Filter by Product ID
+        product_list = ["All Products"] + sorted(filtered_df['product_id'].astype(str).unique().tolist())
+        product_filter = st.sidebar.selectbox("2. Filter by Target Business:", product_list)
+        
+        if product_filter != "All Products":
+            filtered_df = filtered_df[filtered_df['product_id'] == product_filter]
+            
+        # 3. Select User ID from filtered list
+        available_users = filtered_df['user_id'].astype(str).tolist()
+        
+        if len(available_users) == 0:
+            st.sidebar.warning("No records match these exact filters.")
+            selected_user = None
+            analyze_button = st.sidebar.button("Retrieve TRL-SVE Output", type="primary", disabled=True)
+        else:
+            selected_user = st.sidebar.selectbox(
+                f"3. Select User ID ({len(available_users)} available):", 
+                available_users,
+                help="Click the box and start typing to instantly find a user."
+            )
+            analyze_button = st.sidebar.button("Retrieve TRL-SVE Output", type="primary")
+
+    # --- EXECUTE ANALYSIS ---
     if analyze_button and selected_user is not None:
         with st.spinner("Retrieving Pipeline G architectural logs..."):
             time.sleep(0.5) 
             
         # Extract the exact row for this user
-        record = df_results[df_results['user_id'] == str(selected_user)].iloc[0]
+        record = df_results[df_results['user_id'].astype(str) == str(selected_user)].iloc[0]
         
         # Determine Status (Using 50% as the threshold)
         is_fraud = record['predicted_probability'] >= 50.0 
@@ -119,7 +136,7 @@ if not df_results.empty:
             "Weight": [record['weight_relational'], record['weight_behavioral'], record['weight_semantic']],
             "Features Extracted": [
                 "Bipartite graph adjacency mappings",
-                "4 specific behavioral temporal features",
+                "30-step chronological rating sequence",
                 "Sparse-attention contextual semantics"
             ]
         }
