@@ -6,11 +6,12 @@ import time
 # --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="TRL-SVE Dashboard", layout="wide", page_icon="🛡️")
 
-# --- LOAD REAL 50K DATASET ---
+# --- LOAD REAL DATASET ---
 @st.cache_data
 def load_data():
     try:
-        df = pd.read_csv("pipeline_g_results.zip")
+        # Note: If you used the compression workaround for GitHub, change this to "pipeline_g_results.csv.zip"
+        df = pd.read_csv("pipeline_g_results.csv")
         return df
     except FileNotFoundError:
         st.error("Dataset not found. Please ensure pipeline_g_results.csv is uploaded.")
@@ -41,7 +42,7 @@ if not df_results.empty:
         record = df_results[df_results['user_id'] == selected_user].iloc[0]
         
         # Determine Status (Using 50% as the threshold)
-        is_fraud = record['predicted_probability'] > 50.0 
+        is_fraud = record['predicted_probability'] >= 50.0 
         status = "🚨 HIGH RISK: Deceptive Review Detected" if is_fraud else "✅ LOW RISK: Genuine Review"
         status_color = "error" if is_fraud else "success"
 
@@ -56,10 +57,25 @@ if not df_results.empty:
         else: 
             st.success(f"### {status}")
 
+        # --- DYNAMIC EVALUATION LOGIC ---
+        # 1 = Deceptive (Fake), 0 = Genuine
+        pred_class = 1 if record['predicted_probability'] >= 50.0 else 0
+        true_class = int(record['true_label'])
+        
+        # Calculate the exact Confusion Matrix outcome
+        if pred_class == 1 and true_class == 1:
+            eval_result = "✅ True Positive"
+        elif pred_class == 0 and true_class == 0:
+            eval_result = "✅ True Negative"
+        elif pred_class == 1 and true_class == 0:
+            eval_result = "❌ False Positive"
+        elif pred_class == 0 and true_class == 1:
+            eval_result = "❌ False Negative"
+
         col1, col2, col3 = st.columns(3)
         col1.metric("Pipeline G Probability", f"{record['predicted_probability']:.1f}%")
-        col2.metric("True Label (Ground Truth)", "Deceptive" if record['true_label'] in [-1, 0] else "Genuine")
-        col3.metric("Action Space", "Continuous Soft-Voting")
+        col2.metric("True Label (Ground Truth)", "Deceptive" if true_class == 1 else "Genuine")
+        col3.metric("Model Evaluation", eval_result)
         st.divider()
 
         # --- DISPLAY REAL PPO WEIGHTS ---
@@ -70,7 +86,7 @@ if not df_results.empty:
             "Weight": [record['weight_relational'], record['weight_behavioral'], record['weight_semantic']],
             "Features Extracted": [
                 "Bipartite graph adjacency mappings",
-                "30-step chronological rating sequence", # <--- UPDATED HERE
+                "4 specific behavioral temporal features",
                 "Sparse-attention contextual semantics"
             ]
         }
