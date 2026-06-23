@@ -10,7 +10,6 @@ st.set_page_config(page_title="TRL-SVE Dashboard", layout="wide", page_icon="�
 @st.cache_data
 def load_data():
     try:
-        # Pandas automatically handles the extraction of the .zip file
         df = pd.read_csv("pipeline_g_results.zip")
         return df
     except FileNotFoundError:
@@ -35,15 +34,31 @@ if not df_results.empty:
     )
     
     st.sidebar.divider()
+    target_record = None # Placeholder for the final extracted row
     
     if search_mode == "Direct User Lookup":
         st.sidebar.markdown("**Targeted Investigation:**")
         all_users = sorted(df_results['user_id'].astype(str).unique().tolist())
         selected_user = st.sidebar.selectbox(
-            "Search User ID:", 
+            "1. Search User Node (User ID):", 
             all_users,
             help="Click the box and start typing to instantly find a user."
         )
+        
+        # Isolate the specific user to find all their bipartite graph connections
+        user_edges = df_results[df_results['user_id'].astype(str) == str(selected_user)]
+        
+        if len(user_edges) > 1:
+            st.sidebar.success(f"🔗 Topology: {len(user_edges)} connected review edges found.")
+            selected_node = st.sidebar.selectbox(
+                "2. Select Associated Review Node:", 
+                user_edges['product_id'].tolist()
+            )
+            target_record = user_edges[user_edges['product_id'] == selected_node].iloc[0]
+        else:
+            st.sidebar.info("🔗 Topology: 1 connected review edge found.")
+            target_record = user_edges.iloc[0]
+            
         analyze_button = st.sidebar.button("Retrieve TRL-SVE Output", type="primary")
 
     else:
@@ -73,7 +88,6 @@ if not df_results.empty:
         
         if len(available_users) == 0:
             st.sidebar.warning("No records match these exact filters.")
-            selected_user = None
             analyze_button = st.sidebar.button("Retrieve TRL-SVE Output", type="primary", disabled=True)
         else:
             selected_user = st.sidebar.selectbox(
@@ -81,15 +95,17 @@ if not df_results.empty:
                 available_users,
                 help="Click the box and start typing to instantly find a user."
             )
+            # Find the specific row based on the filters
+            target_record = filtered_df[filtered_df['user_id'].astype(str) == str(selected_user)].iloc[0]
             analyze_button = st.sidebar.button("Retrieve TRL-SVE Output", type="primary")
 
     # --- EXECUTE ANALYSIS ---
-    if analyze_button and selected_user is not None:
+    if analyze_button and target_record is not None:
         with st.spinner("Retrieving Pipeline G architectural logs..."):
             time.sleep(0.5) 
-            
-        # Extract the exact row for this user
-        record = df_results[df_results['user_id'].astype(str) == str(selected_user)].iloc[0]
+        
+        # Use the precisely extracted record from the sidebar logic
+        record = target_record
         
         # Determine Status (Using 50% as the threshold)
         is_fraud = record['predicted_probability'] >= 50.0 
